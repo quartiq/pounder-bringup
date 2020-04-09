@@ -128,7 +128,7 @@ fn main() -> ! {
             ad9959::Mode::FourBitSerial, 100_000_000).unwrap();
 
     // Configure the system clock of the AD9959.
-    //ad9959.configure_system_clock(500_000_000_f32).unwrap();
+    ad9959.configure_system_clock(500_000_000_f32).unwrap();
 
     // Test readback-verification of the AD9959 interface.
     if ad9959.self_test().unwrap() {
