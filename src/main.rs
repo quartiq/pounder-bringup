@@ -104,8 +104,8 @@ fn main() -> ! {
     let delay = hal::delay::Delay::new(cp.SYST, clocks.clocks);
 
     let i2c1 = {
-        let sda = gpiob.pb7.into_alternate_af4();
-        let scl = gpiob.pb8.into_alternate_af4();
+        let sda = gpiob.pb7.into_alternate_af4().set_open_drain();
+        let scl = gpiob.pb8.into_alternate_af4().set_open_drain();
         hal::i2c::I2c::i2c1(dp.I2C1, (scl, sda), 100.khz(), &clocks)
     };
 
