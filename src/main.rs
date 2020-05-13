@@ -30,9 +30,6 @@ impl ad9959::Interface for QspiInterface {
 
     fn configure_mode(&mut self, mode: ad9959::Mode) -> Result<(), QspiError> {
         match mode {
-            ad9959::Mode::SingleBitTwoWire | ad9959::Mode::SingleBitThreeWire =>
-                self.qspi.configure_mode(QspiMode::OneBit),
-            ad9959::Mode::TwoBitSerial => self.qspi.configure_mode(QspiMode::TwoBit),
             ad9959::Mode::FourBitSerial => self.qspi.configure_mode(QspiMode::FourBit),
         }
     }
@@ -104,28 +101,32 @@ fn main() -> ! {
     let delay = hal::delay::Delay::new(cp.SYST, clocks.clocks);
 
     let i2c1 = {
-        let sda = gpiob.pb7.into_alternate_af4().set_open_drain();
-        let scl = gpiob.pb8.into_alternate_af4().set_open_drain();
-        hal::i2c::I2c::i2c1(dp.I2C1, (scl, sda), 100.khz(), &clocks)
+        let _sda = gpiob.pb7.into_alternate_af4().set_open_drain();
+        let _scl = gpiob.pb8.into_alternate_af4().set_open_drain();
+        hal::i2c::I2c::i2c1(dp.I2C1, 100.khz(), &clocks)
     };
 
-    let pounder_gpio_expander = mcp23017::MCP23017::new(i2c1, 0x20);
-
-    match pounder_gpio_expander {
-        Ok(mut expander) => {
-            expander.digital_write(14, 0).unwrap();
-            expander.digital_write(15, 0).unwrap();
-
-            // Enable all the pounder LEDs to indicate I2C is functional.
-            for i in 0..8 {
-                expander.digital_write(i, 1).unwrap();
-            }
-        },
-        Err(_) => {}
+    let mut expander = mcp23017::MCP23017::new(i2c1, 0x20).unwrap();
+    // ext_clk_sel=0, osc_en_n=0, att_rst_n=1, leds=0x3f
+    expander.write_gpioab(0x203f).unwrap();
+    for i in 0..16 {
+        expander.pin_mode(i, mcp23017::PinMode::OUTPUT).unwrap();
     }
+    /*
+    // digital_write and all_pin_mode look broken
+    expander.digital_write(15, 0).unwrap(); // internal clock
+    expander.digital_write(14, 0).unwrap(); // osc enable
+    expander.digital_write(13, 1).unwrap(); // no att rst
+
+    // Enable all six pounder LEDs to indicate I2C is functional.
+    for i in 0..6 {
+        expander.digital_write(i, 1).unwrap();
+    }
+    expander.all_pin_mode(mcp23017::PinMode::OUTPUT).unwrap();
+    */
 
     let mut ad9959 = ad9959::Ad9959::new(qspi_interface, &mut reset_pin, io_update_pin, delay,
-            ad9959::Mode::FourBitSerial, 100_000_000).unwrap();
+            100_000_000).unwrap();
 
     // Configure the system clock of the AD9959.
     ad9959.configure_system_clock(500_000_000_f32).unwrap();
