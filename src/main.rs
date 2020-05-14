@@ -13,12 +13,15 @@ use stm32h7xx_hal as hal;
 use ad9959;
 
 // pick a panicking behavior
-extern crate panic_halt; // you can put a breakpoint on `rust_begin_unwind` to catch panics
+// extern crate panic_halt; // you can put a breakpoint on `rust_begin_unwind` to catch panics
 // extern crate panic_abort; // requires nightly
 // extern crate panic_itm; // logs messages over ITM; requires ITM support
-// extern crate panic_semihosting; // logs messages to the host stderr; requires a debugger
+extern crate cortex_m_semihosting;
+extern crate panic_semihosting; // logs messages to the host stderr; requires a debugger
 
 use cortex_m_rt::entry;
+
+use cortex_m_semihosting::{dbg, hprintln};
 
 struct QspiInterface {
     qspi: Qspi,
@@ -107,6 +110,8 @@ fn main() -> ! {
     };
 
     let mut expander = mcp23017::MCP23017::new(i2c1, 0x20).unwrap();
+    // ext_clk_sel=0, osc_en_n=0, att_rst_n=0, leds=0x3f
+    expander.write_gpioab(0x003f).unwrap();
     // ext_clk_sel=0, osc_en_n=0, att_rst_n=1, leds=0x3f
     expander.write_gpioab(0x203f).unwrap();
     for i in 0..16 {
@@ -138,15 +143,43 @@ fn main() -> ! {
         fp_led_3.set_high().unwrap();
     }
 
-    ad9959.set_frequency(ad9959::Channel::One, 80_000_000_f32).unwrap();
-    ad9959.set_frequency(ad9959::Channel::Two, 80_001_000_f32).unwrap();
-    ad9959.set_frequency(ad9959::Channel::Three, 90_000_000_f32).unwrap();
-    ad9959.set_frequency(ad9959::Channel::Four, 90_001_000_f32).unwrap();
+    ad9959.set_frequency(ad9959::Channel::One, 30e6).unwrap();
+    ad9959.set_frequency(ad9959::Channel::Two, 30.1e6).unwrap();
+    ad9959.set_frequency(ad9959::Channel::Three, 40e6).unwrap();
+    ad9959.set_frequency(ad9959::Channel::Four, 40.1e6).unwrap();
+
+    ad9959.set_amplitude(ad9959::Channel::One, 0.99).unwrap();
+    ad9959.set_amplitude(ad9959::Channel::Two, 0.99).unwrap();
+    ad9959.set_amplitude(ad9959::Channel::Three, 0.99).unwrap();
+    ad9959.set_amplitude(ad9959::Channel::Four, 0.99).unwrap();
 
     ad9959.enable_channel(ad9959::Channel::One).unwrap();
     ad9959.enable_channel(ad9959::Channel::Two).unwrap();
     ad9959.enable_channel(ad9959::Channel::Three).unwrap();
     ad9959.enable_channel(ad9959::Channel::Four).unwrap();
+
+    clocks.rb.d2ccip1r.modify(|_, w| w.spi123sel().per());
+    let mut spi = {
+        let spi_mosi = gpiod.pd7.into_alternate_af5();
+        let spi_miso = gpioa.pa6.into_alternate_af5();
+        let spi_sck = gpiog.pg11.into_alternate_af5();
+        let _spi_nss = gpiog.pg10.into_alternate_af5();
+
+        let config = hal::spi::Config::new(hal::spi::Mode{
+                polarity: hal::spi::Polarity::IdleHigh,
+                phase: hal::spi::Phase::CaptureOnSecondTransition,
+            })
+            .frame_size(8);
+
+        dp.SPI1.spi((spi_sck, spi_miso, spi_mosi), config, 10.mhz(), &clocks)
+    };
+
+        let mut att = [0xffu8; 1];
+        spi.transfer(&mut att).unwrap();
+    // latch attenuators
+    expander.write_gpioab(0x2f3f).unwrap();
+    expander.write_gpioab(0x203f).unwrap();
+        //panic!("{}", att[0]);
 
     loop {
         fp_led_0.set_high().unwrap();
