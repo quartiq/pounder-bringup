@@ -110,10 +110,10 @@ fn main() -> ! {
     };
 
     let mut expander = mcp23017::MCP23017::new(i2c1, 0x20).unwrap();
-    // ext_clk_sel=0, osc_en_n=0, att_rst_n=0, leds=0x3f
-    expander.write_gpioab(0x003f).unwrap();
-    // ext_clk_sel=0, osc_en_n=0, att_rst_n=1, leds=0x3f
-    expander.write_gpioab(0x203f).unwrap();
+    // ext_clk_sel=1, osc_en_n=1, att_rst_n=0, leds=0x3f
+    expander.write_gpioab(0xc03f).unwrap();
+    // ext_clk_sel=1, osc_en_n=1, att_rst_n=1, leds=0x3f
+    expander.write_gpioab(0xe03f).unwrap();
     for i in 0..16 {
         expander.pin_mode(i, mcp23017::PinMode::OUTPUT).unwrap();
     }
@@ -131,10 +131,10 @@ fn main() -> ! {
     */
 
     let mut ad9959 = ad9959::Ad9959::new(qspi_interface, &mut reset_pin, io_update_pin, delay,
-            100_000_000).unwrap();
+            10_000_000).unwrap();
 
     // Configure the system clock of the AD9959.
-    ad9959.configure_system_clock(500_000_000_f32).unwrap();
+    ad9959.configure_system_clock(500e6).unwrap();
 
     // Test readback-verification of the AD9959 interface.
     if ad9959.self_test().unwrap() {
@@ -145,13 +145,13 @@ fn main() -> ! {
 
     ad9959.set_frequency(ad9959::Channel::One, 30e6).unwrap();
     ad9959.set_frequency(ad9959::Channel::Two, 30.1e6).unwrap();
-    ad9959.set_frequency(ad9959::Channel::Three, 40e6).unwrap();
-    ad9959.set_frequency(ad9959::Channel::Four, 40.1e6).unwrap();
+    ad9959.set_frequency(ad9959::Channel::Three, 7.8125e6).unwrap();
+    ad9959.set_frequency(ad9959::Channel::Four, 7.8125e6).unwrap();
 
-    ad9959.set_amplitude(ad9959::Channel::One, 0.99).unwrap();
-    ad9959.set_amplitude(ad9959::Channel::Two, 0.99).unwrap();
-    ad9959.set_amplitude(ad9959::Channel::Three, 0.99).unwrap();
-    ad9959.set_amplitude(ad9959::Channel::Four, 0.99).unwrap();
+    ad9959.set_amplitude(ad9959::Channel::One, 1.).unwrap();
+    ad9959.set_amplitude(ad9959::Channel::Two, 1.).unwrap();
+    ad9959.set_amplitude(ad9959::Channel::Three, 1.).unwrap();
+    ad9959.set_amplitude(ad9959::Channel::Four, 1.).unwrap();
 
     ad9959.enable_channel(ad9959::Channel::One).unwrap();
     ad9959.enable_channel(ad9959::Channel::Two).unwrap();
@@ -174,11 +174,11 @@ fn main() -> ! {
         dp.SPI1.spi((spi_sck, spi_miso, spi_mosi), config, 10.mhz(), &clocks)
     };
 
-        let mut att = [0xffu8; 1];
+        let mut att = [0x00u8; 1];
         spi.transfer(&mut att).unwrap();
     // latch attenuators
-    expander.write_gpioab(0x2f3f).unwrap();
-    expander.write_gpioab(0x203f).unwrap();
+    expander.write_gpioab(0xef3f).unwrap();
+    expander.write_gpioab(0xe03f).unwrap();
         //panic!("{}", att[0]);
 
     loop {
